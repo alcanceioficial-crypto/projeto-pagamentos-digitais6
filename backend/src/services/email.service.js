@@ -21,27 +21,31 @@ function formatCurrency(v) {
 }
 
 function montarCorpoEmail(pedido, txid) {
-  const { nome, whatsapp, endereco, itens, total } = pedido;
+  const { nome, whatsapp, endereco, itens, total, vendedoraId, vendedoraNome } = pedido;
 
   let itensTexto = "";
   itens.forEach((item, i) => {
     const sub = item.preco * item.quantidade;
     itensTexto +=
       `  ${i + 1}. ${item.tipo}\n` +
-      `     Tamanho: ${item.tamanho}\n` +
       `     Quantidade: ${item.quantidade}\n` +
       `     Subtotal: ${formatCurrency(sub)}\n\n`;
   });
 
+  // Bloco da vendedora (só aparece se houver indicação)
+  const vendedoraTexto = vendedoraId
+    ? `\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 VENDEDORA\n━━━━━━━━━━━━━━━━━━━━━━\nNome: ${vendedoraNome || vendedoraId}\nCódigo: ${vendedoraId}\n`
+    : "";
+
   return (
-`🛒 NOVO PEDIDO PAGO — LEVANTA LIMEIRA
+`🛒 NOVO PEDIDO PAGO — SANDRA MARIA SEMI-JÓIAS
 
 ━━━━━━━━━━━━━━━━━━━━━━
 👤 DADOS DO CLIENTE
 ━━━━━━━━━━━━━━━━━━━━━━
 Nome: ${nome}
 WhatsApp: ${whatsapp}
-
+${vendedoraTexto}
 ━━━━━━━━━━━━━━━━━━━━━━
 📍 ENDEREÇO DE ENTREGA
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -51,7 +55,7 @@ ${endereco.complemento ? "Complemento: " + endereco.complemento + "\n" : ""}Bair
 Cidade: ${endereco.cidade} - ${endereco.estado}
 
 ━━━━━━━━━━━━━━━━━━━━━━
-👕 ITENS DO PEDIDO
+💎 ITENS DO PEDIDO
 ━━━━━━━━━━━━━━━━━━━━━━
 ${itensTexto}━━━━━━━━━━━━━━━━━━━━━━
 💰 TOTAL: ${formatCurrency(total)}
@@ -68,13 +72,14 @@ async function enviarEmailPedido(pedido, txid) {
     return;
   }
 
-  const assunto = `✅ Pedido pago — ${pedido.nome} — ${formatCurrency(pedido.total)}`;
+  const vendedoraInfo = pedido.vendedoraId ? ` [${pedido.vendedoraNome || pedido.vendedoraId}]` : "";
+  const assunto = `✅ Pedido pago — ${pedido.nome} — ${formatCurrency(pedido.total)}${vendedoraInfo}`;
   const corpo = montarCorpoEmail(pedido, txid);
 
   try {
     console.log(`📤 Enviando e-mail via API Resend para ${EMAIL_TO}...`);
     const result = await resend.emails.send({
-      from: `Loja Levanta Limeira <${EMAIL_FROM}>`,
+      from: `Sandra Maria Semi-Jóias <${EMAIL_FROM}>`,
       to: EMAIL_TO,
       subject: assunto,
       text: corpo
