@@ -5,20 +5,15 @@ const { criarPix, consultarPixPorTxid } = require("../services/efiPix.service");
 const { salvarPedido } = require("../services/pedidoStore.service");
 
 /* ======================================================
-   CONFIGURAÇÃO
-====================================================== */
-
-const PRECO_UNITARIO = 0;
-const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
-
-/* ======================================================
    PREÇOS DOS PRODUTOS (mesma ordem do HTML)
 ====================================================== */
 const PRECOS = {
-  "Conjunto Colar P LT 01 233": 162.00,
-  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
-  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
+  "Conjunto Colar P LT 01 233": 0.20,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 0.20,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 0.20
 };
+
+const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
 
 /* ======================================================
    MAPEAMENTO DE VENDEDORAS
@@ -34,7 +29,7 @@ const VENDEDORAS = {
 ====================================================== */
 router.post("/gerar_pix", async (req, res) => {
   try {
-    const { itens, nome, whatsapp, endereco, vendedoraId } = req.body;
+    const { itens, nome, whatsapp, endereco, vendedoraId, frete } = req.body;
 
     if (!Array.isArray(itens) || itens.length === 0) {
       return res.status(400).json({ erro: "Nenhum item enviado" });
@@ -44,7 +39,7 @@ router.post("/gerar_pix", async (req, res) => {
       return res.status(400).json({ erro: "Dados do cliente incompletos" });
     }
 
-    let total = 0;
+    let subtotal = 0;
     let totalPecas = 0;
 
     for (const item of itens) {
@@ -53,17 +48,21 @@ router.post("/gerar_pix", async (req, res) => {
         return res.status(400).json({ erro: "Quantidade inválida" });
       }
 
-      // Pega o preço pelo nome do produto
       const preco = PRECOS[item.produto];
       if (!preco) {
         return res.status(400).json({ erro: `Produto desconhecido: ${item.produto}` });
       }
 
-      total += preco * qtd;
+      subtotal += preco * qtd;
       totalPecas += qtd;
     }
 
-    total = Number(total.toFixed(2));
+    subtotal = Number(subtotal.toFixed(2));
+
+    // ✅ Valor do frete (vem do frontend após cálculo pela Frenet)
+    const valorFrete = frete && frete.preco ? Number(frete.preco) : 0;
+
+    const total = Number((subtotal + valorFrete).toFixed(2));
 
     if (total < 1) {
       return res.status(400).json({ erro: "Valor mínimo não atingido" });
@@ -80,7 +79,7 @@ router.post("/gerar_pix", async (req, res) => {
       ? VENDEDORAS[vendedoraId].nome
       : null;
 
-    // 💾 SALVA O PEDIDO EM MEMÓRIA
+    // 💾 SALVA O PEDIDO EM MEMÓRIA (com frete)
     salvarPedido(pix.txid, {
       nome,
       whatsapp,
@@ -90,6 +89,13 @@ router.post("/gerar_pix", async (req, res) => {
         quantidade: i.quantidade,
         preco: PRECOS[i.produto]
       })),
+      subtotal,
+      frete: frete ? {
+        transportadora: frete.transportadora,
+        servico: frete.servico,
+        preco: valorFrete,
+        prazo: frete.prazo
+      } : null,
       total,
       metodoPagamento: "pix",
       vendedoraId: vendedoraId || null,
@@ -97,7 +103,7 @@ router.post("/gerar_pix", async (req, res) => {
     });
 
     console.log(
-      `🧾 PIX GERADO | txid: ${pix.txid} | valor: R$ ${total} | peças: ${totalPecas}` +
+      `🧾 PIX GERADO | txid: ${pix.txid} | subtotal: R$ ${subtotal} | frete: R$ ${valorFrete} | total: R$ ${total}` +
       (vendedoraId ? ` | vendedora: ${vendedoraId}` : "")
     );
 
@@ -105,6 +111,8 @@ router.post("/gerar_pix", async (req, res) => {
       txid: pix.txid,
       pix: pix.pixCopiaECola,
       valor: total,
+      subtotal,
+      frete: valorFrete,
       totalPecas
     });
 
