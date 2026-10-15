@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
+
 const pixRoutes = require("./routes/pix.routes");
 const webhookRoutes = require("./routes/webhook.routes");
 const cartaoRoutes = require("./routes/cartao.routes");
+const freteRoutes = require("./routes/frete.routes");
 
 const app = express();
 
@@ -21,6 +23,7 @@ app.use(express.json());
 app.use("/pix", pixRoutes);
 app.use("/webhook", webhookRoutes);
 app.use("/cartao", cartaoRoutes);
+app.use("/frete", freteRoutes);
 
 /* 🩺 Health check */
 app.get("/", (req, res) => {
