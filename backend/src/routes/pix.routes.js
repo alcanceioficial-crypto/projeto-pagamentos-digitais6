@@ -8,15 +8,33 @@ const { salvarPedido } = require("../services/pedidoStore.service");
    CONFIGURAÇÃO
 ====================================================== */
 
-const PRECO_UNITARIO = 89.22;
-const DESCRICAO_PRODUTO = "Camiseta Levanta Limeira";
+const PRECO_UNITARIO = 0;
+const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
 
 /* ======================================================
-   GERAR PIX — AGORA SALVA O PEDIDO EM MEMÓRIA
+   PREÇOS DOS PRODUTOS (mesma ordem do HTML)
+====================================================== */
+const PRECOS = {
+  "Conjunto Colar P LT 01 233": 162.00,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
+};
+
+/* ======================================================
+   MAPEAMENTO DE VENDEDORAS
+====================================================== */
+const VENDEDORAS = {
+  "CR001": { nome: "Camila Rossi" },
+  "SR001": { nome: "Sandra Rossi" },
+  "NT001": { nome: "Nayara Turatti" }
+};
+
+/* ======================================================
+   GERAR PIX
 ====================================================== */
 router.post("/gerar_pix", async (req, res) => {
   try {
-    const { itens, nome, whatsapp, endereco } = req.body;
+    const { itens, nome, whatsapp, endereco, vendedoraId } = req.body;
 
     if (!Array.isArray(itens) || itens.length === 0) {
       return res.status(400).json({ erro: "Nenhum item enviado" });
@@ -34,7 +52,14 @@ router.post("/gerar_pix", async (req, res) => {
       if (!qtd || qtd < 1 || qtd > 50) {
         return res.status(400).json({ erro: "Quantidade inválida" });
       }
-      total += PRECO_UNITARIO * qtd;
+
+      // Pega o preço pelo nome do produto
+      const preco = PRECOS[item.produto];
+      if (!preco) {
+        return res.status(400).json({ erro: `Produto desconhecido: ${item.produto}` });
+      }
+
+      total += preco * qtd;
       totalPecas += qtd;
     }
 
@@ -50,21 +75,30 @@ router.post("/gerar_pix", async (req, res) => {
 
     const pix = await criarPix(total, descricao);
 
+    // Descobre o nome da vendedora (se houver)
+    const vendedoraNome = vendedoraId && VENDEDORAS[vendedoraId]
+      ? VENDEDORAS[vendedoraId].nome
+      : null;
+
+    // 💾 SALVA O PEDIDO EM MEMÓRIA
     salvarPedido(pix.txid, {
       nome,
       whatsapp,
       endereco,
       itens: itens.map(i => ({
-        tipo: "Camiseta Normal",
-        tamanho: i.tamanho,
+        tipo: i.produto,
         quantidade: i.quantidade,
-        preco: PRECO_UNITARIO
+        preco: PRECOS[i.produto]
       })),
-      total
+      total,
+      metodoPagamento: "pix",
+      vendedoraId: vendedoraId || null,
+      vendedoraNome
     });
 
     console.log(
-      `🧾 PIX GERADO | txid: ${pix.txid} | valor: R$ ${total} | peças: ${totalPecas}`
+      `🧾 PIX GERADO | txid: ${pix.txid} | valor: R$ ${total} | peças: ${totalPecas}` +
+      (vendedoraId ? ` | vendedora: ${vendedoraId}` : "")
     );
 
     res.json({
