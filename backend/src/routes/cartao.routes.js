@@ -15,9 +15,9 @@ const { enviarEmailPedido } = require("../services/email.service");
    PREÇOS DOS PRODUTOS
 ====================================================== */
 const PRECOS = {
-  "Conjunto Colar P LT 01 233": 162.00,
-  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
-  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
+  "Conjunto Colar P LT 01 233": 0.20,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 0.20,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 0.20
 };
 
 const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
@@ -53,6 +53,7 @@ router.post("/gerar_pagamento", async (req, res) => {
       whatsapp,
       endereco,
       vendedoraId,
+      frete,
       payment_token,
       dadosCartao,
     } = req.body;
@@ -73,7 +74,7 @@ router.post("/gerar_pagamento", async (req, res) => {
       return res.status(400).json({ erro: "Dados do titular incompletos" });
     }
 
-    let total = 0;
+    let subtotal = 0;
     let totalPecas = 0;
 
     for (const item of itens) {
@@ -87,11 +88,15 @@ router.post("/gerar_pagamento", async (req, res) => {
         return res.status(400).json({ erro: `Produto desconhecido: ${item.produto}` });
       }
 
-      total += preco * qtd;
+      subtotal += preco * qtd;
       totalPecas += qtd;
     }
 
-    total = Number(total.toFixed(2));
+    subtotal = Number(subtotal.toFixed(2));
+
+    // ✅ Valor do frete
+    const valorFrete = frete && frete.preco ? Number(frete.preco) : 0;
+    const total = Number((subtotal + valorFrete).toFixed(2));
 
     if (total < 0.01) {
       return res.status(400).json({ erro: "Valor mínimo não atingido" });
@@ -103,8 +108,7 @@ router.post("/gerar_pagamento", async (req, res) => {
 
     const telefoneLimpo = limparTelefone(whatsapp);
 
-    console.log(`💳 Iniciando cobrança cartão | valor: R$ ${total} | peças: ${totalPecas}`);
-    console.log(`📞 Telefone original: ${whatsapp} | limpo: ${telefoneLimpo}`);
+    console.log(`💳 Iniciando cobrança cartão | subtotal: R$ ${subtotal} | frete: R$ ${valorFrete} | total: R$ ${total}`);
 
     const cobranca = await criarCobrancaCartao({
       valor: total,
@@ -117,7 +121,6 @@ router.post("/gerar_pagamento", async (req, res) => {
 
     console.log(`💳 Cobrança criada | charge_id: ${cobranca.chargeId}`);
 
-    // Descobre o nome da vendedora
     const vendedoraNome = vendedoraId && VENDEDORAS[vendedoraId]
       ? VENDEDORAS[vendedoraId].nome
       : null;
@@ -131,6 +134,13 @@ router.post("/gerar_pagamento", async (req, res) => {
         quantidade: i.quantidade,
         preco: PRECOS[i.produto]
       })),
+      subtotal,
+      frete: frete ? {
+        transportadora: frete.transportadora,
+        servico: frete.servico,
+        preco: valorFrete,
+        prazo: frete.prazo
+      } : null,
       total,
       metodoPagamento: "cartao",
       vendedoraId: vendedoraId || null,
@@ -180,6 +190,8 @@ router.post("/gerar_pagamento", async (req, res) => {
       chargeId: cobranca.chargeId,
       status: statusPagamento,
       valor: total,
+      subtotal,
+      frete: valorFrete,
       totalPecas,
       metodo: "cartao",
       mensagem:
