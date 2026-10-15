@@ -12,14 +12,27 @@ const { salvarPedido, buscarPedido, removerPedido } = require("../services/pedid
 const { enviarEmailPedido } = require("../services/email.service");
 
 /* ======================================================
-   CONFIGURAÇÃO (DEVE SER IGUAL AO pix.routes.js)
+   PREÇOS DOS PRODUTOS
 ====================================================== */
+const PRECOS = {
+  "Conjunto Colar P LT 01 233": 162.00,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
+};
 
-const PRECO_UNITARIO = 89.22;
-const DESCRICAO_PRODUTO = "Camiseta Levanta Limeira";
+const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
 
 /* ======================================================
-   LIMPA TELEFONE PARA O PADRÃO DA EFÍ
+   MAPEAMENTO DE VENDEDORAS
+====================================================== */
+const VENDEDORAS = {
+  "CR001": { nome: "Camila Rossi" },
+  "SR001": { nome: "Sandra Rossi" },
+  "NT001": { nome: "Nayara Turatti" }
+};
+
+/* ======================================================
+   LIMPA TELEFONE
 ====================================================== */
 function limparTelefone(tel) {
   let nums = (tel || "").replace(/\D/g, "");
@@ -30,7 +43,7 @@ function limparTelefone(tel) {
 }
 
 /* ======================================================
-   GERAR COBRANÇA DE CARTÃO + PAGAR COM TOKEN
+   GERAR PAGAMENTO CARTÃO
 ====================================================== */
 router.post("/gerar_pagamento", async (req, res) => {
   try {
@@ -39,6 +52,7 @@ router.post("/gerar_pagamento", async (req, res) => {
       nome,
       whatsapp,
       endereco,
+      vendedoraId,
       payment_token,
       dadosCartao,
     } = req.body;
@@ -67,7 +81,13 @@ router.post("/gerar_pagamento", async (req, res) => {
       if (!qtd || qtd < 1 || qtd > 50) {
         return res.status(400).json({ erro: "Quantidade inválida" });
       }
-      total += PRECO_UNITARIO * qtd;
+
+      const preco = PRECOS[item.produto];
+      if (!preco) {
+        return res.status(400).json({ erro: `Produto desconhecido: ${item.produto}` });
+      }
+
+      total += preco * qtd;
       totalPecas += qtd;
     }
 
@@ -77,7 +97,6 @@ router.post("/gerar_pagamento", async (req, res) => {
       return res.status(400).json({ erro: "Valor mínimo não atingido" });
     }
 
-    // ✅ Descrição com timestamp para evitar "Limite de emissões idênticas"
     const descricao = `${DESCRICAO_PRODUTO} (${totalPecas} ${
       totalPecas === 1 ? "peça" : "peças"
     }) - ${nome} - ${Date.now()}`;
@@ -98,22 +117,26 @@ router.post("/gerar_pagamento", async (req, res) => {
 
     console.log(`💳 Cobrança criada | charge_id: ${cobranca.chargeId}`);
 
-    // Monta o objeto do pedido (usado tanto para salvar quanto para o e-mail)
+    // Descobre o nome da vendedora
+    const vendedoraNome = vendedoraId && VENDEDORAS[vendedoraId]
+      ? VENDEDORAS[vendedoraId].nome
+      : null;
+
     const pedido = {
       nome,
       whatsapp,
       endereco,
       itens: itens.map(i => ({
-        tipo: "Camiseta Normal",
-        tamanho: i.tamanho,
+        tipo: i.produto,
         quantidade: i.quantidade,
-        preco: PRECO_UNITARIO,
+        preco: PRECOS[i.produto]
       })),
       total,
       metodoPagamento: "cartao",
+      vendedoraId: vendedoraId || null,
+      vendedoraNome
     };
 
-    // Salva pedido em memória
     salvarPedido(cobranca.chargeId, pedido);
 
     const pagamento = await pagarCobrancaCartao(
@@ -140,18 +163,17 @@ router.post("/gerar_pagamento", async (req, res) => {
       pagamento?.status ||
       "unknown";
 
-    // ✅ Aceita "paid" OU "approved" como pagamento confirmado
     if (statusPagamento === "paid" || statusPagamento === "approved") {
-      console.log(`✅ CARTÃO PAGO (${statusPagamento}) — enviando e-mail para a loja...`);
+      console.log(`✅ CARTÃO PAGO (${statusPagamento}) — enviando e-mail...`);
       try {
         await enviarEmailPedido(pedido, cobranca.chargeId);
         removerPedido(cobranca.chargeId);
         console.log(`📧 E-mail enviado e pedido removido da memória`);
       } catch (emailErr) {
-        console.error("⚠️ Erro ao enviar e-mail (mas pagamento OK):", emailErr.message);
+        console.error("⚠️ Erro ao enviar e-mail:", emailErr.message);
       }
     } else {
-      console.log(`⏳ Pagamento com status "${statusPagamento}" — aguardando confirmação`);
+      console.log(`⏳ Pagamento com status "${statusPagamento}" — aguardando`);
     }
 
     res.json({
@@ -163,17 +185,15 @@ router.post("/gerar_pagamento", async (req, res) => {
       mensagem:
         (statusPagamento === "paid" || statusPagamento === "approved")
           ? "Pagamento aprovado!"
-          : "Pagamento em processamento. Aguarde a confirmação.",
+          : "Pagamento em processamento.",
     });
 
   } catch (err) {
     console.error("❌ Erro ao gerar pagamento cartão:", err.message);
-
     if (err.response) {
       console.error("   Status:", err.response.status);
       console.error("   Body:", JSON.stringify(err.response.data, null, 2));
     }
-
     res.status(500).json({
       erro: "Erro ao processar pagamento com cartão",
       detalhe: err.response?.data || err.message,
@@ -182,7 +202,7 @@ router.post("/gerar_pagamento", async (req, res) => {
 });
 
 /* ======================================================
-   CONSULTAR STATUS DA COBRANÇA (polling do frontend)
+   STATUS DA COBRANÇA (polling)
 ====================================================== */
 router.get("/status_cartao", async (req, res) => {
   try {
@@ -193,7 +213,6 @@ router.get("/status_cartao", async (req, res) => {
     const status = cobranca.data?.status || cobranca.status;
     console.log(`🔍 Consulta cartão ${chargeId}: ${status}`);
 
-    // ✅ Aceita "paid" OU "approved" como pagamento confirmado
     if (status === "paid" || status === "approved") {
       const pedido = buscarPedido(chargeId);
       if (pedido) {
