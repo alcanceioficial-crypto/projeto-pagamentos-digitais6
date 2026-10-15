@@ -15,9 +15,9 @@ const { enviarEmailPedido } = require("../services/email.service");
    PREÇOS DOS PRODUTOS
 ====================================================== */
 const PRECOS = {
-  "Conjunto Colar P LT 01 233": 162.00,
-  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
-  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
+  "Conjunto Colar P LT 01 233": 1.00,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 1.00,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 1.00
 };
 
 const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
