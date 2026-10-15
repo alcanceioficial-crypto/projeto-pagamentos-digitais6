@@ -8,9 +8,9 @@ const { salvarPedido } = require("../services/pedidoStore.service");
    PREÇOS DOS PRODUTOS (mesma ordem do HTML)
 ====================================================== */
 const PRECOS = {
-  "Conjunto Colar P LT 01 233": 0.20,
-  "Conjunto Oval Zircônia — Ref. LT 09 006": 0.20,
-  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 0.20
+  "Conjunto Colar P LT 01 233": 162.00,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 162.00
 };
 
 const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
