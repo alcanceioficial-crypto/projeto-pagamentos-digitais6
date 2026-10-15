@@ -21,7 +21,7 @@ function formatCurrency(v) {
 }
 
 function montarCorpoEmail(pedido, txid) {
-  const { nome, whatsapp, endereco, itens, total, vendedoraId, vendedoraNome } = pedido;
+  const { nome, whatsapp, endereco, itens, subtotal, frete, total, vendedoraId, vendedoraNome } = pedido;
 
   let itensTexto = "";
   itens.forEach((item, i) => {
@@ -32,9 +32,12 @@ function montarCorpoEmail(pedido, txid) {
       `     Subtotal: ${formatCurrency(sub)}\n\n`;
   });
 
-  // Bloco da vendedora (só aparece se houver indicação)
   const vendedoraTexto = vendedoraId
     ? `\n━━━━━━━━━━━━━━━━━━━━━━\n🎯 VENDEDORA\n━━━━━━━━━━━━━━━━━━━━━━\nNome: ${vendedoraNome || vendedoraId}\nCódigo: ${vendedoraId}\n`
+    : "";
+
+  const freteTexto = frete
+    ? `\n━━━━━━━━━━━━━━━━━━━━━━\n📦 FRETE\n━━━━━━━━━━━━━━━━━━━━━━\n${frete.transportadora} - ${frete.servico}\nPrazo: ${frete.prazo} dia${frete.prazo > 1 ? "s" : ""}\nValor: ${formatCurrency(frete.preco)}\n`
     : "";
 
   return (
@@ -53,11 +56,13 @@ CEP: ${endereco.cep}
 Rua: ${endereco.rua}, Nº ${endereco.numero}
 ${endereco.complemento ? "Complemento: " + endereco.complemento + "\n" : ""}Bairro: ${endereco.bairro}
 Cidade: ${endereco.cidade} - ${endereco.estado}
-
+${freteTexto}
 ━━━━━━━━━━━━━━━━━━━━━━
 💎 ITENS DO PEDIDO
 ━━━━━━━━━━━━━━━━━━━━━━
 ${itensTexto}━━━━━━━━━━━━━━━━━━━━━━
+📦 SUBTOTAL: ${formatCurrency(subtotal || 0)}
+📦 FRETE: ${frete ? formatCurrency(frete.preco) : "-"}
 💰 TOTAL: ${formatCurrency(total)}
 ━━━━━━━━━━━━━━━━━━━━━━
 
