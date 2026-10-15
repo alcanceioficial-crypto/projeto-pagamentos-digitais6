@@ -10,7 +10,7 @@ const { salvarPedido } = require("../services/pedidoStore.service");
 const PRECOS = {
   "Conjunto Colar P LT 01 233": 162.00,
   "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
-  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 162.00
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
 };
 
 const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
