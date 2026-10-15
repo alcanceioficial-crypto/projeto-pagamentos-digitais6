@@ -15,9 +15,9 @@ const DESCRICAO_PRODUTO = "Sandra Maria Semi-Jóias";
    PREÇOS DOS PRODUTOS (mesma ordem do HTML)
 ====================================================== */
 const PRECOS = {
-  "Conjunto Colar P LT 01 233": 162.00,
-  "Conjunto Oval Zircônia — Ref. LT 09 006": 162.00,
-  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 151.00
+  "Conjunto Colar P LT 01 233": 0.10,
+  "Conjunto Oval Zircônia — Ref. LT 09 006": 0.10,
+  "Brinco Trio Gota/Zircônia P — Ref. LT 09 018": 0.10
 };
 
 /* ======================================================
